@@ -171,18 +171,7 @@ def show_tensile_analysis() -> None:
         st.info("Chargez un fichier CSV pour tracer et analyser vos courbes.")
         return
 
-    input_columns = st.columns(3)
-    stress_source = input_columns[0].selectbox(
-        "Grandeur disponible en ordonnée",
-        ["Contrainte déjà calculée", "Force"],
-        key="stress_source",
-    )
-    strain_source = input_columns[1].selectbox(
-        "Grandeur disponible en abscisse",
-        ["Déformation", "Déplacement"],
-        key="strain_source",
-    )
-    delimiter = input_columns[2].selectbox(
+    delimiter = st.selectbox(
         "Séparateur CSV", ["Automatique", ";", ",", "Tabulation"], key="csv_delimiter"
     )
     delimiter = "\t" if delimiter == "Tabulation" else delimiter
@@ -194,33 +183,6 @@ def show_tensile_analysis() -> None:
     decimal_separator = parse_options[1].selectbox(
         "Séparateur décimal", [".", ","], key="decimal_separator"
     )
-    controls = st.columns(4)
-    force_unit = "N"
-    stress_unit = "MPa (N/mm²)"
-    if stress_source == "Force":
-        force_unit = controls[0].selectbox("Unité de force", ["N", "kN"], key="force_unit")
-        width = controls[1].number_input(
-            "Largeur initiale (mm)", min_value=0.000001, value=10.0, step=0.5,
-            key="test_width",
-        )
-        thickness = controls[2].number_input(
-            "Épaisseur initiale (mm)", min_value=0.000001, value=2.0, step=0.1,
-            key="test_thickness",
-        )
-        controls[3].caption(f"Section initiale : **{width * thickness:.4g} mm²**")
-    else:
-        stress_unit = controls[0].selectbox(
-            "Unité de contrainte", ["MPa (N/mm²)", "Pa", "kPa", "GPa"], key="stress_unit"
-        )
-
-    strain_unit = st.selectbox(
-        "Unité de déformation mesurée",
-        ["Sans dimension (mm/mm)", "Pourcentage (%)"],
-        disabled=strain_source == "Déplacement",
-        key="strain_unit",
-    )
-    if strain_source == "Déplacement":
-        st.caption("Le déplacement est divisé par la longueur initiale L₀ pour obtenir ε = ΔL / L₀.")
 
     analysis_columns = st.columns(2)
     strain_min = analysis_columns[0].number_input(
@@ -275,6 +237,7 @@ def show_tensile_analysis() -> None:
         "GPa": 1e3,
     }
 
+    curve_configs: list[dict[str, object]] = []
     for index, uploaded_file in enumerate(uploaded_files):
         st.markdown(f"#### {uploaded_file.name}")
         try:
@@ -292,65 +255,167 @@ def show_tensile_analysis() -> None:
             st.warning(f"Le fichier **{uploaded_file.name}** doit contenir au moins deux colonnes.")
             continue
 
-        with st.expander(f"Colonnes et apparence — {uploaded_file.name}", expanded=True):
-            file_cols = st.columns(4)
-            strain_column = file_cols[0].selectbox(
-                "Colonne déformation / déplacement",
-                options,
-                key=f"strain_col_{index}",
+        with st.expander(f"Courbes et colonnes — {uploaded_file.name}", expanded=True):
+            curve_count = st.number_input(
+                "Nombre de courbes à extraire de ce fichier",
+                min_value=1,
+                max_value=12,
+                value=1,
+                step=1,
+                key=f"curve_count_{index}",
+                help="Chaque courbe utilise sa propre paire de colonnes et ses propres unités.",
             )
-            stress_column = file_cols[1].selectbox(
-                "Colonne contrainte / force",
-                options,
-                index=min(1, len(options) - 1),
-                key=f"stress_col_{index}",
-            )
-            label = file_cols[2].text_input(
-                "Nom de la courbe",
-                Path(uploaded_file.name).stem,
-                key=f"curve_label_{index}",
-            )
-            color = file_cols[3].color_picker(
-                "Couleur", palette[index % len(palette)], key=f"curve_color_{index}"
-            )
-            gauge_length = None
-            if strain_source == "Déplacement":
-                gauge_length = st.number_input(
-                    f"Longueur initiale L₀ de {uploaded_file.name} (mm)",
-                    min_value=0.000001,
-                    value=50.0,
-                    step=1.0,
-                    key=f"gauge_length_{index}",
-                )
             st.dataframe(
                 data.head(),
                 width="stretch",
                 alt=f"Aperçu des premières lignes de {uploaded_file.name}",
             )
+            for curve_index in range(int(curve_count)):
+                st.markdown(f"**Courbe {curve_index + 1}**")
+                curve_key = f"{index}_{curve_index}"
+                source_columns = st.columns(4)
+                strain_source = source_columns[0].selectbox(
+                    "Grandeur en X",
+                    ["Déformation", "Déplacement"],
+                    key=f"strain_source_{curve_key}",
+                )
+                strain_column = source_columns[1].selectbox(
+                    "Colonne en X",
+                    options,
+                    key=f"strain_col_{curve_key}",
+                )
+                stress_source = source_columns[2].selectbox(
+                    "Grandeur en Y",
+                    ["Contrainte déjà calculée", "Force"],
+                    key=f"stress_source_{curve_key}",
+                )
+                stress_column = source_columns[3].selectbox(
+                    "Colonne en Y",
+                    options,
+                    index=min(1, len(options) - 1),
+                    key=f"stress_col_{curve_key}",
+                )
 
-        if strain_column == stress_column:
-            st.warning(f"Choisissez deux colonnes différentes pour **{uploaded_file.name}**.")
-            continue
+                curve_details = st.columns(4)
+                if strain_source == "Déplacement":
+                    gauge_length = curve_details[0].number_input(
+                        "Longueur initiale L₀ (mm)",
+                        min_value=0.000001,
+                        value=50.0,
+                        step=1.0,
+                        key=f"gauge_length_{curve_key}",
+                    )
+                    strain_unit = None
+                else:
+                    gauge_length = None
+                    strain_unit = curve_details[0].selectbox(
+                        "Unité de déformation",
+                        ["Sans dimension (mm/mm)", "Pourcentage (%)"],
+                        key=f"strain_unit_{curve_key}",
+                    )
 
+                if stress_source == "Force":
+                    force_unit = curve_details[1].selectbox(
+                        "Unité de force", ["N", "kN"], key=f"force_unit_{curve_key}"
+                    )
+                    width = curve_details[2].number_input(
+                        "Largeur initiale (mm)",
+                        min_value=0.000001,
+                        value=10.0,
+                        step=0.5,
+                        key=f"test_width_{curve_key}",
+                    )
+                    thickness = curve_details[3].number_input(
+                        "Épaisseur initiale (mm)",
+                        min_value=0.000001,
+                        value=2.0,
+                        step=0.1,
+                        key=f"test_thickness_{curve_key}",
+                    )
+                    curve_details[3].caption(
+                        f"Section : **{width * thickness:.4g} mm²**"
+                    )
+                    stress_unit = None
+                else:
+                    force_unit = None
+                    width = None
+                    thickness = None
+                    stress_unit = curve_details[1].selectbox(
+                        "Unité de contrainte",
+                        ["MPa (N/mm²)", "Pa", "kPa", "GPa"],
+                        key=f"stress_unit_{curve_key}",
+                    )
+
+                appearance = st.columns(2)
+                label = appearance[0].text_input(
+                    "Nom de la courbe",
+                    f"{Path(uploaded_file.name).stem} — {curve_index + 1}",
+                    key=f"curve_label_{curve_key}",
+                )
+                color = appearance[1].color_picker(
+                    "Couleur",
+                    palette[(index + curve_index) % len(palette)],
+                    key=f"curve_color_{curve_key}",
+                )
+                if strain_column == stress_column:
+                    st.warning(
+                        f"Choisissez deux colonnes différentes pour la courbe "
+                        f"{curve_index + 1} de **{uploaded_file.name}**."
+                    )
+                    continue
+                curve_configs.append(
+                    {
+                        "data": data,
+                        "strain_column": strain_column,
+                        "stress_column": stress_column,
+                        "strain_source": strain_source,
+                        "stress_source": stress_source,
+                        "gauge_length": gauge_length,
+                        "strain_unit": strain_unit,
+                        "force_unit": force_unit,
+                        "width": width,
+                        "thickness": thickness,
+                        "stress_unit": stress_unit,
+                        "label": label,
+                        "color": color,
+                        "filename": uploaded_file.name,
+                    }
+                )
+
+    for curve_config in curve_configs:
+        data = curve_config["data"]
+        assert isinstance(data, pd.DataFrame)
+        filename = str(curve_config["filename"])
+        strain_column = str(curve_config["strain_column"])
+        stress_column = str(curve_config["stress_column"])
+        strain_source = str(curve_config["strain_source"])
+        stress_source = str(curve_config["stress_source"])
+        label = str(curve_config["label"])
+        color = str(curve_config["color"])
         strain_values = numeric_column(data, strain_column).to_numpy(dtype=float)
         stress_values = numeric_column(data, stress_column).to_numpy(dtype=float)
         if strain_source == "Déplacement":
-            assert gauge_length is not None
+            gauge_length = float(curve_config["gauge_length"])
             strain_values = strain_values / gauge_length
-        elif strain_unit == "Pourcentage (%)":
+        elif curve_config["strain_unit"] == "Pourcentage (%)":
             strain_values = strain_values / 100.0
 
         if stress_source == "Force":
-            force_values = stress_values * (1000.0 if force_unit == "kN" else 1.0)
+            force_values = stress_values * (
+                1000.0 if curve_config["force_unit"] == "kN" else 1.0
+            )
+            width = float(curve_config["width"])
+            thickness = float(curve_config["thickness"])
             stress_values = force_values / (width * thickness)
         else:
+            stress_unit = str(curve_config["stress_unit"])
             stress_values = stress_values * stress_factors[stress_unit]
 
         valid = np.isfinite(strain_values) & np.isfinite(stress_values)
         strain_values = strain_values[valid]
         stress_values = stress_values[valid]
         if len(strain_values) < 2:
-            st.warning(f"Pas assez de valeurs numériques valides dans **{uploaded_file.name}**.")
+            st.warning(f"Pas assez de valeurs numériques valides dans **{filename}**.")
             continue
 
         figure.add_trace(
@@ -622,13 +687,16 @@ def show_help() -> None:
         """
         ### 1. Calculs simples et essais de traction / compression
         La calculatrice rapide utilise une section rectangulaire, `A₀ = largeur x épaisseur`.
-        Pour un fichier d'essai, chargez un ou plusieurs CSV, puis choisissez les colonnes
-        correspondant à la déformation (ou au déplacement) et à la contrainte (ou à la force).
+        Pour un fichier d'essai, chargez un ou plusieurs CSV, puis configurez chaque courbe
+        séparément. Un même fichier peut fournir plusieurs courbes en choisissant des paires
+        de colonnes différentes.
 
-        - **Contrainte déjà calculée** : choisissez son unité. Les résultats sont ramenés en MPa.
+        - **Contrainte déjà calculée** : choisissez son unité ; elle est convertie en MPa sans
+          nouvelle division par la section.
         - **Force** : saisissez la largeur et l'épaisseur initiales en mm. Avec une force en N,
           `σ nominale (MPa) = F (N) / A₀ (mm²)` ; sélectionnez kN si nécessaire.
-        - **Déplacement** : saisissez la longueur initiale de chaque éprouvette ; `ε = ΔL / L₀`.
+        - **Déplacement** : saisissez la longueur initiale de la courbe ; `ε = ΔL / L₀`.
+        - **Déformation** : choisissez si les valeurs sont sans dimension ou en pourcentage.
         - **Module d'Young** : pente d'une régression linéaire dans l'intervalle de déformation
           choisi. Ajustez les bornes pour ne garder que la partie élastique.
         - **Rm / Rc** : maxima en traction et magnitude de la contrainte en compression,
