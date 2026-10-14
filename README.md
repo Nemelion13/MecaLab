@@ -14,11 +14,12 @@ The project focuses on the mechanical side of the problem rather than the graphi
 
 The core idea of MecaLab is to make mechanical analysis accessible and fast for common material testing workflows:
 
-1. Input a test result in CSV form.
-2. Select the columns corresponding to strain (or displacement) and stress (or force).
-3. Convert raw data into stress-strain curves.
-4. Estimate elastic parameters and yield point.
-5. Compare different curves and export the plots.
+1. Upload one or more test results in CSV form.
+2. Configure one or more curves per file, selecting each curve's columns and input quantities.
+3. Convert raw force/displacement data into stress-strain curves while preserving data that
+   already contains stress and strain.
+4. Estimate elastic parameters and yield point, and compare two curves quantitatively.
+5. Inspect annotated plots and export them.
 
 This is useful for quick engineering checks, teaching, or preliminary material characterization.
 
@@ -35,7 +36,12 @@ The strain is computed as:
 
 - `ε = ΔL / L0`
 
-If the input data is already in stress and strain units, no conversion is needed. If the user provides force and displacement, the app converts them before plotting and analysis.
+Each curve is configured independently. Stress values already calculated are converted from
+their selected unit to MPa without applying the specimen-area conversion again. Force values
+are converted to newtons and divided by the selected initial cross-sectional area. Strain
+values can be supplied directly (dimensionless or percent), or derived from displacement and
+the selected initial gauge length. This lets experimental and simulation curves from the same
+CSV be compared without applying the wrong conversion to either one.
 
 ### 2. Young's modulus
 
@@ -73,6 +79,37 @@ The algorithm works as follows:
 - Return the corresponding strain and stress pair.
 
 This gives a single yield point `(ε_yield, σ_yield)` that is used to display the `Rp0,2` marker on the curve.
+
+### 4. Curve comparison
+
+When at least two usable curves are available, the comparison panel lets the user choose a
+reference curve and a second curve. The app sorts each curve by strain and averages stress
+values at duplicate strain points, then linearly interpolates both series on 500 evenly spaced
+points over their shared strain interval. Data outside that common interval is not extrapolated.
+
+The comparison reports:
+
+- **RMSE (MPa)**: square root of the mean squared stress difference.
+- **Maximum absolute error (MPa)**: largest absolute pointwise stress difference.
+- **Mean bias (MPa)**: mean of `comparison stress - reference stress`; positive means the
+  comparison curve is, on average, above the reference.
+- **Relative RMSE (%)**: RMSE divided by the reference stress range (`max - min`) and
+  multiplied by 100. It is shown as unavailable when the reference has no stress range.
+
+These indicators quantify curve separation on the shared strain interval. They do not by
+themselves define whether a simulation or test passes an engineering acceptance criterion.
+
+### 5. Plot annotations
+
+The tensile/compression plot labels calculated characteristic points directly on each curve:
+
+- **E** marks the fitted elastic line at the mean strain of the selected elastic data points;
+  its label reports the fitted Young's modulus in MPa.
+- **Rm** marks the largest nonnegative stress and reports its tensile strength in MPa.
+- **Rc** marks the most negative stress and reports its compressive magnitude in MPa; the
+  plotted stress remains negative.
+- **Rp0,2** marks the detected 0.2% offset intersection when the offset analysis is enabled
+  and a crossing is found.
 
 ## Main functions and what they do
 
@@ -135,13 +172,15 @@ This is the central analysis page of the app.
 It allows the user to:
 
 - load one or more CSV files,
-- choose which columns are strain/displacement and stress/force,
-- convert displacement to strain using `ΔL / L0`,
-- convert force to stress using `F / A0`,
+- configure up to 12 curves per CSV, each with its own selected strain/displacement and
+  stress/force columns,
+- choose units and conversions independently for every curve,
+- convert displacement to strain using `ΔL / L0` and force to stress using `F / A0`,
 - select the elastic range used for fitting,
 - calculate the Young's modulus,
 - detect the 0.2% offset yield point,
-- plot all curves together,
+- plot all curves together with E, Rm/Rc, and Rp0,2 annotations when available,
+- compare two curves over their common strain interval using error metrics,
 - summarize maximum tensile/compressive strengths and modulus values.
 
 This is the main material testing workflow in the app.
@@ -177,12 +216,15 @@ This displays usage notes explaining the interpretation of the calculations, uni
 ## Typical workflow in the app
 
 1. Load one or more test files.
-2. Select the correct columns for strain/displacement and stress/force.
-3. Choose units (MPa, kPa, Pa, GPa, etc.).
+2. For each file, choose how many curves to extract and configure each pair of columns.
+3. For each curve, identify strain or displacement and already-calculated stress or force,
+   then enter the corresponding units and specimen dimensions when needed.
 4. Select an elastic window for the linear regression.
-5. Enable the offset analysis to compute `Rp0.2`.
-6. Inspect the curve and the resulting metrics table.
-7. Export the plot if needed.
+5. Enable the offset analysis to compute and annotate `Rp0.2`.
+6. Inspect the annotated plot and the resulting metrics table.
+7. If at least two curves are available, choose a reference and a comparison curve to view
+   their error metrics over the common strain interval.
+8. Export the interactive plot as HTML or save a PNG from the Plotly toolbar.
 
 ## Mechanical interpretation of the results
 

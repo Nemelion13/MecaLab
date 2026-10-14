@@ -94,6 +94,40 @@ def calculate_offset_yield(
     return float(intersection_strain), float(intersection_stress)
 
 
+def interpolate_common_curves(
+    reference_strain: np.ndarray,
+    reference_stress: np.ndarray,
+    comparison_strain: np.ndarray,
+    comparison_stress: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+    """Interpolate two curves over their shared strain interval."""
+
+    def sorted_unique_curve(
+        strain: np.ndarray, stress: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        order = np.argsort(strain)
+        sorted_strain = strain[order]
+        sorted_stress = stress[order]
+        unique_strain, inverse = np.unique(sorted_strain, return_inverse=True)
+        stress_sums = np.bincount(inverse, weights=sorted_stress)
+        counts = np.bincount(inverse)
+        return unique_strain, stress_sums / counts
+
+    reference_x, reference_y = sorted_unique_curve(reference_strain, reference_stress)
+    comparison_x, comparison_y = sorted_unique_curve(comparison_strain, comparison_stress)
+    common_min = max(float(reference_x[0]), float(comparison_x[0]))
+    common_max = min(float(reference_x[-1]), float(comparison_x[-1]))
+    if common_max <= common_min:
+        return None
+
+    sample_strain = np.linspace(common_min, common_max, 500)
+    return (
+        sample_strain,
+        np.interp(sample_strain, reference_x, reference_y),
+        np.interp(sample_strain, comparison_x, comparison_y),
+    )
+
+
 def show_plot_downloads(figure: go.Figure, filename: str, key: str) -> None:
     st.plotly_chart(
         figure,
@@ -227,6 +261,7 @@ def show_tensile_analysis() -> None:
 
     figure = go.Figure()
     metrics: list[dict[str, object]] = []
+    curve_series: list[dict[str, object]] = []
     palette = ["#176B87", "#E76F51", "#2A9D8F", "#7B61A8", "#E9A03B", "#344E41"]
     elastic_min_for_zoom: list[float] = []
     elastic_max_for_zoom: list[float] = []
@@ -429,6 +464,14 @@ def show_tensile_analysis() -> None:
                 hovertemplate="ε = %{x:.6g}<br>σ = %{y:.6g} MPa<extra>%{fullData.name}</extra>",
             )
         )
+        curve_series.append(
+            {
+                "label": label,
+                "filename": filename,
+                "strain": strain_values.copy(),
+                "stress": stress_values.copy(),
+            }
+        )
 
         elastic = (
             (strain_values >= strain_min)
@@ -452,6 +495,23 @@ def show_tensile_analysis() -> None:
                     name=f"Young {label} ({young:.4g} MPa)",
                     line={"color": color, "dash": "dash", "width": 2},
                     hovertemplate="ε = %{x:.6g}<br>σ = %{y:.6g} MPa<extra>%{fullData.name}</extra>",
+                )
+            )
+            young_marker_x = float(np.mean(strain_values[elastic]))
+            figure.add_trace(
+                go.Scatter(
+                    x=[young_marker_x],
+                    y=[young * young_marker_x + intercept],
+                    mode="markers+text",
+                    text=[f"E {young:.4g} MPa"],
+                    textposition="top center",
+                    name=f"Repère Young — {label}",
+                    showlegend=False,
+                    marker={"color": color, "size": 10, "symbol": "diamond"},
+                    hovertemplate=(
+                        f"Module d’Young = {young:.6g} MPa"
+                        "<extra>%{fullData.name}</extra>"
+                    ),
                 )
             )
             elastic_min_for_zoom.append(float(np.min(strain_values[elastic])))
@@ -487,12 +547,55 @@ def show_tensile_analysis() -> None:
                         go.Scatter(
                             x=[yield_point[0]],
                             y=[yield_point[1]],
-                            mode="markers",
+                            mode="markers+text",
+                            text=[f"Rp0,2 {yield_point[1]:.4g} MPa"],
+                            textposition="top center",
                             name=f"Rp0,2 {label}",
+                            showlegend=False,
                             marker={"color": color, "size": 10, "symbol": "x"},
                             hovertemplate="ε = %{x:.6g}<br>Rp0,2 = %{y:.6g} MPa<extra></extra>",
                         )
                     )
+
+        tensile_indices = np.flatnonzero(stress_values >= 0)
+        if len(tensile_indices):
+            rm_index = int(tensile_indices[np.argmax(stress_values[tensile_indices])])
+            figure.add_trace(
+                go.Scatter(
+                    x=[strain_values[rm_index]],
+                    y=[stress_values[rm_index]],
+                    mode="markers+text",
+                    text=[f"Rm {stress_values[rm_index]:.4g} MPa"],
+                    textposition="top center",
+                    name=f"Repère Rm — {label}",
+                    showlegend=False,
+                    marker={"color": color, "size": 10, "symbol": "circle-open"},
+                    hovertemplate=(
+                        "Rm = %{y:.6g} MPa<br>ε = %{x:.6g}"
+                        "<extra>%{fullData.name}</extra>"
+                    ),
+                )
+            )
+        compression_indices = np.flatnonzero(stress_values < 0)
+        if len(compression_indices):
+            rc_index = int(compression_indices[np.argmin(stress_values[compression_indices])])
+            figure.add_trace(
+                go.Scatter(
+                    x=[strain_values[rc_index]],
+                    y=[stress_values[rc_index]],
+                    mode="markers+text",
+                    text=[f"Rc {abs(stress_values[rc_index]):.4g} MPa"],
+                    textposition="bottom center",
+                    name=f"Repère Rc — {label}",
+                    showlegend=False,
+                    marker={"color": color, "size": 10, "symbol": "square-open"},
+                    hovertemplate=(
+                        "Rc = %{customdata:.6g} MPa<br>σ = %{y:.6g} MPa"
+                        "<br>ε = %{x:.6g}<extra>%{fullData.name}</extra>"
+                    ),
+                    customdata=[abs(float(stress_values[rc_index]))],
+                )
+            )
 
         metrics.append(
             {
@@ -542,6 +645,71 @@ def show_tensile_analysis() -> None:
             else:
                 st.warning("Y max doit être supérieur à Y min.")
         show_plot_downloads(figure, "courbes_traction_compression", "tensile_chart")
+        if len(curve_series) >= 2:
+            st.subheader("Comparer deux courbes")
+            comparison_options = [
+                f"{index + 1}. {series['label']} — {series['filename']}"
+                for index, series in enumerate(curve_series)
+            ]
+            comparison_columns = st.columns(2)
+            reference_index = comparison_columns[0].selectbox(
+                "Courbe de référence",
+                range(len(curve_series)),
+                format_func=lambda index: comparison_options[index],
+                key="comparison_reference",
+            )
+            comparison_index = comparison_columns[1].selectbox(
+                "Courbe à comparer",
+                range(len(curve_series)),
+                index=1 if reference_index == 0 else 0,
+                format_func=lambda index: comparison_options[index],
+                key="comparison_target",
+            )
+            if reference_index == comparison_index:
+                st.info("Sélectionnez deux courbes différentes pour les comparer.")
+            else:
+                reference_curve = curve_series[reference_index]
+                comparison_curve = curve_series[comparison_index]
+                comparison_data = interpolate_common_curves(
+                    reference_curve["strain"],
+                    reference_curve["stress"],
+                    comparison_curve["strain"],
+                    comparison_curve["stress"],
+                )
+                if comparison_data is None:
+                    st.warning(
+                        "Les deux courbes doivent partager un intervalle de déformation "
+                        "contenant au moins deux points distincts."
+                    )
+                else:
+                    common_strain, reference_stress, comparison_stress = comparison_data
+                    stress_difference = comparison_stress - reference_stress
+                    rmse = float(np.sqrt(np.mean(stress_difference**2)))
+                    max_error = float(np.max(np.abs(stress_difference)))
+                    mean_bias = float(np.mean(stress_difference))
+                    reference_range = float(np.ptp(reference_stress))
+                    relative_rmse = (
+                        rmse / reference_range * 100.0 if reference_range > 0 else None
+                    )
+                    comparison_metrics = st.columns(4)
+                    comparison_metrics[0].metric("RMSE (MPa)", f"{rmse:.5g}")
+                    comparison_metrics[1].metric(
+                        "Écart absolu max. (MPa)", f"{max_error:.5g}"
+                    )
+                    comparison_metrics[2].metric("Biais moyen (MPa)", f"{mean_bias:.5g}")
+                    comparison_metrics[3].metric(
+                        "RMSE / étendue référence",
+                        f"{relative_rmse:.5g} %" if relative_rmse is not None else "N/D",
+                    )
+                    st.caption(
+                        f"Comparaison de « {comparison_curve['label']} » moins "
+                        f"« {reference_curve['label']} » sur {len(common_strain)} points "
+                        f"uniformément interpolés dans l’intervalle commun "
+                        f"[{common_strain[0]:.6g}, {common_strain[-1]:.6g}] de déformation. "
+                        "Le RMSE relatif est normalisé par l’étendue de la référence. "
+                        "Un biais positif signifie que la courbe comparée est en moyenne "
+                        "au-dessus de la référence."
+                    )
         st.subheader("Résultats")
         st.dataframe(
             pd.DataFrame(metrics),
@@ -704,6 +872,15 @@ def show_help() -> None:
         - **Rp0,2** : première intersection détectée avec la droite parallèle décalée de 0,002
           dans la direction de chargement. Cette valeur est indicative et dépend de la qualité
           de la mesure.
+        - **Comparaison de courbes** : lorsque deux courbes au moins sont exploitables,
+          choisissez une référence et une courbe à comparer. Les deux séries sont interpolées
+          sur 500 points régulièrement répartis dans leur intervalle de déformation commun ;
+          aucune extrapolation n'est faite en dehors de cet intervalle.
+          Le **RMSE** est la racine de l'erreur quadratique moyenne en MPa, l'**écart absolu
+          maximal** est la plus grande différence ponctuelle, et le **biais moyen** correspond
+          à la contrainte comparée moins la contrainte de référence (un biais positif indique
+          une courbe comparée globalement au-dessus). Le **RMSE relatif** rapporte le RMSE à
+          l'étendue de contrainte de la référence ; il est indisponible si cette étendue est nulle.
 
         ### 2. Matériaux composites
         Les calculs reprennent les relations utilisées dans `Analyse.py` : loi des mélanges
@@ -720,6 +897,10 @@ def show_help() -> None:
         utilisez la molette pour zoomer (si activée), puis double-cliquez pour revenir à la vue
         initiale. La barre d'outils du graphique offre l'export PNG ; le bouton sous le graphique
         télécharge une version HTML interactive.
+        Les repères affichent les valeurs calculées directement sur les courbes : **E** indique
+        le module d'Young ajusté dans la zone élastique, **Rm** le maximum en traction, **Rc**
+        la magnitude du maximum en compression (la courbe reste signée), et **Rp0,2** le point
+        d'intersection avec la droite décalée lorsqu'il est détecté.
 
         Les CSV peuvent être séparés par `;`, `,`, une tabulation, ou détectés automatiquement.
         Les valeurs non numériques sont ignorées dans les calculs. Vérifiez les unités, le
