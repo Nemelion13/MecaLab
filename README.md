@@ -51,6 +51,12 @@ The app estimates the elastic modulus from a linear fit of the selected elastic 
 
 This is done with a least-squares linear regression using `numpy.polyfit(...)` on the chosen strain window. In the code, the relevant section is selected by a user-defined strain range (`strain_min` and `strain_max`). The slope of the fitted line is the Young's modulus, and the intercept is the corresponding offset at zero strain.
 
+The reported non-conventional elastic limit `Re` is the measured stress at the selected upper
+elastic strain bound. If the bound falls between measured points, stress is linearly interpolated
+after sorting the data by strain. Duplicate strain values are averaged. No value is reported when
+the selected bound lies outside the measured strain range; the app does not extrapolate. This
+user-defined `Re` is distinct from the `Rp0.2` offset yield strength.
+
 ### 3. 0.2% offset yield criterion
 
 The function `calculate_offset_yield()` is the most important mechanical routine in this project. It implements the common engineering yield criterion used for metals and similar ductile materials:
@@ -231,6 +237,7 @@ This displays usage notes explaining the interpretation of the calculations, uni
 The most important outputs are:
 
 - `Young's modulus`: stiffness in the elastic region,
+- `Re`: stress at the user-selected maximum strain of the elastic range (non-conventional),
 - `Rm`: maximum tensile stress reached,
 - `Rc`: magnitude of maximum compressive stress,
 - `Rp0.2`: engineering yield stress by the 0.2% offset method.

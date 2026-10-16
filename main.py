@@ -63,6 +63,25 @@ def numeric_column(data: pd.DataFrame, column: str) -> pd.Series:
     return pd.to_numeric(data[column], errors="coerce")
 
 
+def interpolate_stress_at_strain(
+    strain: np.ndarray,
+    stress: np.ndarray,
+    target_strain: float,
+) -> float | None:
+    """Interpolate measured stress at a strain, without extrapolating."""
+    order = np.argsort(strain)
+    sorted_strain = strain[order]
+    sorted_stress = stress[order]
+    unique_strain, inverse = np.unique(sorted_strain, return_inverse=True)
+    stress_sums = np.bincount(inverse, weights=sorted_stress)
+    counts = np.bincount(inverse)
+    mean_stress = stress_sums / counts
+
+    if target_strain < unique_strain[0] or target_strain > unique_strain[-1]:
+        return None
+    return float(np.interp(target_strain, unique_strain, mean_stress))
+
+
 def calculate_offset_yield(
     strain: np.ndarray,
     stress: np.ndarray,
@@ -453,6 +472,27 @@ def show_tensile_analysis() -> None:
             st.warning(f"Pas assez de valeurs numériques valides dans **{filename}**.")
             continue
 
+        elastic_limit_stress = interpolate_stress_at_strain(
+            strain_values, stress_values, strain_max
+        )
+        if elastic_limit_stress is not None:
+            figure.add_trace(
+                go.Scatter(
+                    x=[strain_max],
+                    y=[elastic_limit_stress],
+                    mode="markers+text",
+                    text=[f"Re {elastic_limit_stress:.4g} MPa"],
+                    textposition="bottom right",
+                    name=f"Re à ε={strain_max:.4g} — {label}",
+                    showlegend=False,
+                    marker={"color": color, "size": 10, "symbol": "star"},
+                    hovertemplate=(
+                        "Re à ε = %{x:.6g}<br>σ = %{y:.6g} MPa"
+                        "<extra>%{fullData.name}</extra>"
+                    ),
+                )
+            )
+
         figure.add_trace(
             go.Scatter(
                 x=strain_values,
@@ -609,10 +649,14 @@ def show_tensile_analysis() -> None:
                     else None
                 ),
                 "Module d'Young (MPa)": young,
+                "Borne élastique min.": strain_min,
+                "Borne élastique max.": strain_max,
+                "Re à la borne élastique max. (MPa)": elastic_limit_stress,
                 "Rp0,2 (MPa)": yield_point[1] if yield_point is not None else None,
                 "Points valides": len(strain_values),
             }
         )
+
         if young is None:
             st.warning(
                 f"Zone élastique insuffisante pour **{label}** : vérifiez ses bornes "
@@ -865,6 +909,10 @@ def show_help() -> None:
         - **Déformation** : choisissez si les valeurs sont sans dimension ou en pourcentage.
         - **Module d'Young** : pente d'une régression linéaire dans l'intervalle de déformation
           choisi. Ajustez les bornes pour ne garder que la partie élastique.
+        - **Re à la borne élastique max.** : contrainte mesurée ou interpolée à la déformation
+          maximale choisie pour la zone élastique. Cette limite non conventionnelle dépend donc
+          de la borne saisie ; aucune valeur n'est donnée si cette déformation est hors des
+          données disponibles. Elle est distincte de Rp0,2.
         - **Rm / Rc** : maxima en traction et magnitude de la contrainte en compression,
           respectivement. La compression demeure signée sur les courbes.
         - **Rp0,2** : première intersection détectée avec la droite parallèle décalée de 0,002
@@ -896,8 +944,9 @@ def show_help() -> None:
         initiale. La barre d'outils du graphique offre l'export PNG ; le bouton sous le graphique
         télécharge une version HTML interactive.
         Les repères affichent les valeurs calculées directement sur les courbes : **E** indique
-        le module d'Young ajusté dans la zone élastique, **Rm** le maximum en traction, **Rc**
-        la magnitude du maximum en compression (la courbe reste signée), et **Rp0,2** le point
+        le module d'Young ajusté dans la zone élastique, **Re** la contrainte à la borne
+        supérieure de déformation élastique choisie, **Rm** le maximum en traction, **Rc** la
+        magnitude du maximum en compression (la courbe reste signée), et **Rp0,2** le point
         d'intersection avec la droite décalée lorsqu'il est détecté.
 
         Les CSV peuvent être séparés par `;`, `,`, une tabulation, ou détectés automatiquement.
