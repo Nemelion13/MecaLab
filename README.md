@@ -111,6 +111,8 @@ The tensile/compression plot labels calculated characteristic points directly on
 
 - **E** marks the fitted elastic line at the mean strain of the selected elastic data points;
   its label reports the fitted Young's modulus in MPa.
+- **Re** marks the interpolated stress at the user-selected maximum elastic strain when that
+  strain lies within the data range.
 - **Rm** marks the largest nonnegative stress and reports its tensile strength in MPa.
 - **Rc** marks the most negative stress and reports its compressive magnitude in MPa; the
   plotted stress remains negative.
@@ -147,6 +149,23 @@ It evaluates the intersection between the measured stress-strain data and the of
 If there is no valid crossing, it returns `None`.
 
 This is how the app identifies the yield stress for the `Rp0.2` criterion.
+
+### `build_analysis_pdf(curves, comparison, x_label, y_label)`
+
+Builds a multi-page A4 landscape report with Matplotlib and `PdfPages`:
+
+- one page per analyzed curve, including source/configuration, the complete curve, the
+  `ε = 0` to `0.0022` detail view, and its calculated mechanical properties;
+- a final comparison page when two distinct curves have a valid shared strain interval,
+  including full and zoomed overlays plus the comparison metrics.
+
+The PDF plots are rendered directly from the normalized analysis data, so static report
+generation does not depend on Plotly's image-export engine.
+
+### `build_results_csv(metrics)`
+
+Exports the per-curve result table as UTF-8 with a byte-order mark, semicolon-delimited and
+decimal-comma formatted for common French spreadsheet settings.
 
 ### `show_plot_downloads(figure, filename, key)`
 
@@ -185,9 +204,11 @@ It allows the user to:
 - select the elastic range used for fitting,
 - calculate the Young's modulus,
 - detect the 0.2% offset yield point,
-- plot all curves together with E, Rm/Rc, and Rp0,2 annotations when available,
+- plot all curves together with E, Re, Rm/Rc, and Rp0,2 annotations when available,
 - compare two curves over their common strain interval using error metrics,
-- summarize maximum tensile/compressive strengths and modulus values.
+- summarize maximum tensile/compressive strengths and modulus values,
+- download a per-curve CSV summary and a PDF report with full/zoomed plots and an optional
+  comparison page.
 
 This is the main material testing workflow in the app.
 
@@ -230,7 +251,11 @@ This displays usage notes explaining the interpretation of the calculations, uni
 6. Inspect the annotated plot and the resulting metrics table.
 7. If at least two curves are available, choose a reference and a comparison curve to view
    their error metrics over the common strain interval.
-8. Export the interactive plot as HTML or save a PNG from the Plotly toolbar.
+8. Export the per-curve metrics as CSV. Select **Generate PDF report** to prepare the report,
+   then download it. It contains one page per curve and, when a valid pair is selected, a
+   comparison page; each curve page includes both its full plot and the `0`–`0.0022` strain
+   zoom. If the analyzed data or report settings change, generate a fresh report.
+9. Export the interactive plot as HTML or save a PNG from the Plotly toolbar.
 
 ## Mechanical interpretation of the results
 

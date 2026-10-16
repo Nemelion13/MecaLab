@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+
 from io import BytesIO
 from pathlib import Path
 
@@ -8,6 +9,10 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 from streamlit.typing import UploadedFile
+
+from build_report import *
+from build_report import _report_signature
+
 
 
 st.set_page_config(
@@ -145,6 +150,9 @@ def interpolate_common_curves(
         np.interp(sample_strain, reference_x, reference_y),
         np.interp(sample_strain, comparison_x, comparison_y),
     )
+
+
+
 
 
 def show_plot_downloads(figure: go.Figure, filename: str, key: str) -> None:
@@ -504,12 +512,28 @@ def show_tensile_analysis() -> None:
                 hovertemplate="ε = %{x:.6g}<br>σ = %{y:.6g} MPa<extra>%{fullData.name}</extra>",
             )
         )
+        strain_details = (
+            f"L₀ = {float(curve_config['gauge_length']):.5g} mm"
+            if strain_source == "Déplacement"
+            else str(curve_config["strain_unit"])
+        )
+        stress_details = (
+            f"{curve_config['force_unit']}, A₀ = "
+            f"{float(curve_config['width']) * float(curve_config['thickness']):.5g} mm²"
+            if stress_source == "Force"
+            else str(curve_config["stress_unit"])
+        )
         curve_series.append(
             {
                 "label": label,
                 "filename": filename,
                 "strain": strain_values.copy(),
                 "stress": stress_values.copy(),
+                "color": color,
+                "configuration": (
+                    f"ε depuis {strain_column} ({strain_source}, {strain_details}) ; "
+                    f"σ depuis {stress_column} ({stress_source}, {stress_details})"
+                ),
             }
         )
 
@@ -656,6 +680,16 @@ def show_tensile_analysis() -> None:
                 "Points valides": len(strain_values),
             }
         )
+        curve_series[-1].update(
+            {
+                "metrics": metrics[-1],
+                "young": young,
+                "intercept": intercept,
+                "elastic_range": (strain_min, strain_max),
+                "elastic_limit_stress": elastic_limit_stress,
+                "yield_point": yield_point,
+            }
+        )
 
         if young is None:
             st.warning(
@@ -665,6 +699,7 @@ def show_tensile_analysis() -> None:
         elif show_offset and yield_point is None:
             st.info(f"Aucune intersection Rp0,2 détectée pour **{label}** dans les données.")
 
+    comparison_report: dict[str, object] | None = None
     if metrics:
         figure.update_layout(
             title=curve_title,
@@ -733,6 +768,18 @@ def show_tensile_analysis() -> None:
                     relative_rmse = (
                         rmse / reference_range * 100.0 if reference_range > 0 else None
                     )
+                    comparison_report = {
+                        "reference": reference_curve,
+                        "compared": comparison_curve,
+                        "strain_min": float(common_strain[0]),
+                        "strain_max": float(common_strain[-1]),
+                        "metrics": {
+                            "rmse": rmse,
+                            "max_error": max_error,
+                            "mean_bias": mean_bias,
+                            "relative_rmse": relative_rmse,
+                        },
+                    }
                     comparison_metrics = st.columns(4)
                     comparison_metrics[0].metric("RMSE (MPa)", f"{rmse:.5g}")
                     comparison_metrics[1].metric(
@@ -759,6 +806,33 @@ def show_tensile_analysis() -> None:
             hide_index=True,
             alt="Résultats des résistances, modules d'Young et limites d'élasticité des essais.",
         )
+        st.download_button(
+            "Télécharger les résultats (CSV)",
+            data=build_results_csv(metrics),
+            file_name="resultats_analyse.csv",
+            mime="text/csv; charset=utf-8",
+            key="analysis_csv_download",
+        )
+        report_signature = _report_signature(
+            curve_series, comparison_report, x_label, y_label
+        )
+        if st.session_state.get("analysis_pdf_signature") != report_signature:
+            st.session_state.pop("analysis_pdf_signature", None)
+            st.session_state.pop("analysis_pdf_data", None)
+        if st.button("Générer le rapport PDF", key="generate_analysis_pdf"):
+            with st.spinner("Préparation du rapport et des graphiques…"):
+                st.session_state["analysis_pdf_data"] = build_analysis_pdf(
+                    curve_series, comparison_report, x_label, y_label
+                )
+                st.session_state["analysis_pdf_signature"] = report_signature
+        if st.session_state.get("analysis_pdf_signature") == report_signature:
+            st.download_button(
+                "Télécharger le rapport PDF",
+                data=st.session_state["analysis_pdf_data"],
+                file_name=(st.text_input("Entrer le nom du fichier à enregistrer sans extension").strip() or "rapport_analyse_mecanique")+ ".pdf",
+                mime="application/pdf",
+                key="analysis_pdf_download",
+            )
     else:
         st.info("Aucune courbe exploitable. Vérifiez les fichiers et les colonnes sélectionnées.")
 
@@ -948,6 +1022,14 @@ def show_help() -> None:
         supérieure de déformation élastique choisie, **Rm** le maximum en traction, **Rc** la
         magnitude du maximum en compression (la courbe reste signée), et **Rp0,2** le point
         d'intersection avec la droite décalée lorsqu'il est détecté.
+        Cliquez sur « Générer le rapport PDF », puis téléchargez-le : une page est créée par
+        courbe, chacune avec le graphique complet, un zoom de ε = 0 à 0,0022, les paramètres
+        d'entrée et les résultats calculés. Si les données ou les réglages changent, régénérez
+        le rapport.
+        Si deux courbes distinctes sont sélectionnées et ont un intervalle commun, le rapport
+        ajoute une page de comparaison avec les courbes superposées et leurs métriques.
+        L'export CSV contient les résultats par courbe au format UTF-8, séparateur `;` et
+        décimales `,` pour les tableurs configurés en français.
 
         Les CSV peuvent être séparés par `;`, `,`, une tabulation, ou détectés automatiquement.
         Les valeurs non numériques sont ignorées dans les calculs. Vérifiez les unités, le
