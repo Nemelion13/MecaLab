@@ -490,7 +490,7 @@ def show_tensile_analysis() -> None:
             figure.add_trace(
                 go.Scatter(
                     x=elastic_x,
-                    y=young * elastic_x + intercept,
+                    y=young * elastic_x + intercept, # σ = E * ε + b , zone élastique
                     mode="lines",
                     name=f"Young {label} ({young:.4g} MPa)",
                     line={"color": color, "dash": "dash", "width": 2},
@@ -527,9 +527,7 @@ def show_tensile_analysis() -> None:
                 )
                 offset_start = direction * 0.002
                 offset_end = (
-                    float(np.max(strain_values))
-                    if direction > 0
-                    else float(np.min(strain_values))
+                    yield_point[0] if yield_point is not None else direction * 0.01
                 )
                 if direction * (offset_end - offset_start) >= 0:
                     offset_x = np.linspace(offset_start, offset_end, 100)
@@ -610,7 +608,7 @@ def show_tensile_analysis() -> None:
                     if np.any(stress_values < 0)
                     else None
                 ),
-                "Module d’Young (MPa)": young,
+                "Module d'Young (MPa)": young,
                 "Rp0,2 (MPa)": yield_point[1] if yield_point is not None else None,
                 "Points valides": len(strain_values),
             }
@@ -704,9 +702,9 @@ def show_tensile_analysis() -> None:
                     st.caption(
                         f"Comparaison de « {comparison_curve['label']} » moins "
                         f"« {reference_curve['label']} » sur {len(common_strain)} points "
-                        f"uniformément interpolés dans l’intervalle commun "
+                        f"uniformément interpolés dans l'intervalle commun "
                         f"[{common_strain[0]:.6g}, {common_strain[-1]:.6g}] de déformation. "
-                        "Le RMSE relatif est normalisé par l’étendue de la référence. "
+                        "Le RMSE relatif est normalisé par l'étendue de la référence. "
                         "Un biais positif signifie que la courbe comparée est en moyenne "
                         "au-dessus de la référence."
                     )
@@ -715,7 +713,7 @@ def show_tensile_analysis() -> None:
             pd.DataFrame(metrics),
             width="stretch",
             hide_index=True,
-            alt="Résultats des résistances, modules d’Young et limites d’élasticité des essais.",
+            alt="Résultats des résistances, modules d'Young et limites d'élasticité des essais.",
         )
     else:
         st.info("Aucune courbe exploitable. Vérifiez les fichiers et les colonnes sélectionnées.")
