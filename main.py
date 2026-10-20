@@ -12,6 +12,7 @@ from streamlit.typing import UploadedFile
 
 from build_report import *
 from build_report import _report_signature
+from resistance_materials import show_material_strength
 
 
 
@@ -955,16 +956,6 @@ def show_composite_analysis() -> None:
         f"à 45° : Gxy = {gxy[len(gxy) // 2]:.4g} GPa."
     )
 
-def show_material_strength() -> None:
-    st.header("Résistance des matériaux")
-    st.markdown(
-        "Calculs de résistance des poutres et colonnes selon les sections et les matériaux."
-    )
-    st.subheader("Calculs de flexion et de flambement")
-    st.info(
-        "Cette section est en cours de développement. Les calculs seront bientôt disponibles "
-        "pour les sections rectangulaires, circulaires et en I, avec différents matériaux."
-    )
 def show_help() -> None:
     st.header("Notes d'utilisation")
     st.markdown(
@@ -1035,6 +1026,21 @@ def show_help() -> None:
         Les valeurs non numériques sont ignorées dans les calculs. Vérifiez les unités, le
         séparateur de champs, le séparateur décimal et les colonnes si une courbe ou une pente
         n'apparaît pas.
+
+        ### 4. Résistance des matériaux
+        La rubrique dédiée permet de calculer A, Iy et le module de section élastique de sections
+        rectangulaires, rondes pleines, tubulaires et en I symétriques. En flexion, sélectionnez
+        l'un des cas prédéfinis : poutre simplement appuyée avec charge ponctuelle centrée ou
+        uniformément répartie, ou porte-à-faux avec charge en bout ou uniformément répartie.
+        Les dimensions et portées sont saisies en mm, les forces ponctuelles en N et les charges
+        réparties en N/mm ; le module d'Young peut être entré en GPa ou MPa.
+        Les résultats comprennent V(x), M(x), la déformée, les réactions, la contrainte normale
+        maximale de flexion et la flèche maximale. Une comparaison indicative fy / |σ|max à une
+        limite élastique et à un coefficient de sécurité cible peut être activée.
+
+        Ces modèles supposent une poutre prismatique et un matériau élastique linéaire, de petites
+        déformations et la théorie d'Euler–Bernoulli. Le cisaillement, le flambement, le déversement,
+        la fatigue, les assemblages et les vérifications réglementaires ne sont pas calculés.
         """
     )
 

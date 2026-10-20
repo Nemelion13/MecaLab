@@ -227,14 +227,36 @@ It uses the following concepts:
 
 The app then plots the evolution of elastic properties with angle `θ`, giving a quick understanding of orthotropic material behavior.
 
-### `show_material_strength()`
+### `resistance_materials.py`
 
-This section is intended for structural strength calculations such as bending and buckling. At the moment it is still a placeholder, but it is designed to host future calculations for:
+The dedicated **Résistance des matériaux** section is implemented in this module to keep the
+main Streamlit script focused on navigation and the existing analyses.
 
-- rectangular sections,
-- circular sections,
-- I-sections,
-- different materials and safety conditions.
+Section characterization currently supports:
+
+- rectangular sections;
+- solid circular sections;
+- hollow circular tubes;
+- symmetric I-sections.
+
+It reports area `A`, centroidal second moment of area `Iy` about the horizontal bending axis,
+and elastic section modulus `Wel = Iy / c`, where `c` is the distance from the neutral axis to
+the furthest outer fibre. The section dimensions and schematic use millimetres, so the reported
+units are `mm²`, `mm⁴`, and `mm³`.
+
+The beam calculator covers four elastic Euler–Bernoulli cases: a simply supported beam with a
+central point load or full-span uniform load, and a cantilever with a tip point load or a
+full-length uniform load. It displays shear force, bending moment and deflection diagrams,
+support reactions, maximum flexural stress `|M|max / Wel`, and maximum deflection. An optional
+yield-strength input reports an indicative ratio `fy / |σ|max`.
+
+Loads are entered in N for point forces and N/mm for distributed loads; span and section
+dimensions are in mm; stress is in MPa. The elastic modulus may be entered in GPa or MPa.
+If a yield strength is supplied, the app reports the indicative flexural ratio
+`n = fy / |σ|max` and compares it with the user's target ratio. The simplified models assume
+a prismatic beam, linear-elastic homogeneous material, small deflections and Euler–Bernoulli
+behavior. They do not check shear stress, buckling, lateral torsional buckling, fatigue,
+connections, or design-code requirements.
 
 ### `show_help()`
 
@@ -256,6 +278,9 @@ This displays usage notes explaining the interpretation of the calculations, uni
    comparison page; each curve page includes both its full plot and the `0`–`0.0022` strain
    zoom. If the analyzed data or report settings change, generate a fresh report.
 9. Export the interactive plot as HTML or save a PNG from the Plotly toolbar.
+10. In **Résistance des matériaux**, choose a section shape to inspect `A`, `Iy` and `Wel`, or
+    switch to beam flexure, enter the span, load and Young's modulus, and inspect the response
+    diagrams and calculated maximum values.
 
 ## Mechanical interpretation of the results
 
