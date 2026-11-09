@@ -304,6 +304,46 @@ def _add_bar_form(material_data: dict[str, float]) -> None:
 
 def _truss_figure(truss: Truss, result: TrussResult, scale: float) -> go.Figure:
     figure = go.Figure()
+    initial_nodes = truss.knuckles
+    max_force = max(
+        (
+            np.hypot(node.strength_x, node.strength_y)
+            for node in initial_nodes
+        ),
+        default=0.0,
+    )
+    max_span = max(
+        (
+            np.ptp([node.x for node in initial_nodes]),
+            np.ptp([node.y for node in initial_nodes]),
+        ),
+        default=0.0,
+    )
+    arrow_length = max_span * 0.18 if max_span > 0 else 1.0
+    if max_force > 0:
+        for node in initial_nodes:
+            force_magnitude = float(np.hypot(node.strength_x, node.strength_y))
+            if force_magnitude == 0:
+                continue
+            arrow_scale = arrow_length * force_magnitude / max_force
+            figure.add_annotation(
+                x=node.x + arrow_scale * node.strength_x / force_magnitude,
+                y=node.y + arrow_scale * node.strength_y / force_magnitude,
+                ax=node.x,
+                ay=node.y,
+                xref="x",
+                yref="y",
+                axref="x",
+                ayref="y",
+                text=f"F ({node.strength_x:g}, {node.strength_y:g}) N",
+                showarrow=True,
+                arrowhead=3,
+                arrowsize=1,
+                arrowwidth=2,
+                arrowcolor="#d62728",
+                font={"color": "#d62728"},
+            )
+
     for bar in truss.bars:
         first_index = truss._node_indices[bar.knuckle1.id]
         second_index = truss._node_indices[bar.knuckle2.id]
@@ -350,6 +390,7 @@ def _truss_figure(truss: Truss, result: TrussResult, scale: float) -> go.Figure:
         template="plotly_white",
         legend={"orientation": "h"},
         margin={"l": 10, "r": 10, "t": 50, "b": 10},
+        hovermode="closest",
     )
     figure.update_yaxes(scaleanchor="x", scaleratio=1)
     return figure
