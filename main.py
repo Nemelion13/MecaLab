@@ -1042,6 +1042,37 @@ def show_help() -> None:
         Ces modèles supposent une poutre prismatique et un matériau élastique linéaire, de petites
         déformations et la théorie d'Euler–Bernoulli. Le cisaillement, le flambement, le déversement,
         la fatigue, les assemblages et les vérifications réglementaires ne sont pas calculés.
+
+        ### 5. Treillis plan
+        Dans « Calcul de treillis plan », saisissez d'abord le module d'Young commun aux barres
+        et leur section, puis ajoutez les nœuds avec leurs coordonnées, leurs forces appliquées
+        et leurs appuis. Ajoutez ensuite les barres en choisissant leurs deux nœuds d'extrémité.
+        Les coordonnées sont en mm, les forces en N, le module d'Young en Pa et les sections
+        en mm².
+
+        Les appuis bloquent les translations indiquées : « Bloqué en x et y » immobilise les deux
+        directions, « Bloqué en x » ou « Bloqué en y » n'en immobilise qu'une, et « Libre » n'en
+        bloque aucune. Le modèle a deux degrés de liberté de translation par nœud; aucune rotation
+        nodale n'est prise en compte.
+
+        Cliquez sur « Calculer le treillis » pour obtenir les déplacements et réactions aux nœuds,
+        ainsi que les efforts axiaux et contraintes normales dans les barres. Un effort axial positif
+        correspond à la traction et un effort négatif à la compression. Le graphique montre la
+        géométrie initiale en pointillés gris et la déformée en bleu; le facteur choisi amplifie
+        uniquement cette déformée pour la visualisation.
+
+        Les flèches rouges représentent les forces appliquées saisies, pas les réactions d'appui.
+        Elles partent des nœuds du treillis initial et indiquent la direction des composantes Fx et
+        Fy; leurs longueurs sont proportionnelles aux intensités relatives pour faciliter la lecture,
+        et ne constituent pas une échelle de force. Les composantes sont également indiquées en N.
+        L'indice `m + r - 2j` donne une indication de détermination statique, mais un indice nul ne
+        garantit pas la stabilité géométrique : le calcul vérifie aussi la matrice de rigidité et
+        signale les mécanismes ou appuis insuffisants.
+
+        Ce calcul suppose des barres droites articulées, un comportement élastique linéaire et de
+        petites déformations. Le matériau et la section sont communs à toutes les barres. Le poids
+        propre, le flambement, les déformations thermiques et les vérifications réglementaires ne
+        sont pas modélisés. Utilisez « Effacer le modèle » pour recommencer une saisie.
         """
     )
 

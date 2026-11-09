@@ -8,7 +8,8 @@ The project focuses on the mechanical side of the problem rather than the graphi
 - elastic modulus (Young's modulus),
 - yield strength through the 0.2% offset method,
 - strength-based summaries for traction and compression,
-- approximate properties for unidirectional composites.
+- approximate properties for unidirectional composites,
+- linear-elastic analysis of 2D pin-jointed trusses.
 
 ## Project goal
 
@@ -118,6 +119,41 @@ The tensile/compression plot labels calculated characteristic points directly on
   plotted stress remains negative.
 - **Rp0,2** marks the detected 0.2% offset intersection when the offset analysis is enabled
   and a crossing is found.
+
+### 6. 2D truss analysis
+
+The **Calcul de treillis plan** tab models straight, pin-jointed bars with two translational
+degrees of freedom per node. The solver assembles each bar's global stiffness matrix into the
+truss matrix and solves `F = K U` after applying the specified supports. Nodal loads and support
+reactions are treated separately.
+
+Use the following units:
+
+- node coordinates: mm;
+- applied forces and support reactions: N;
+- Young's modulus: Pa;
+- bar cross-sectional area: mm²;
+- reported nodal displacements: mm;
+- axial bar forces: N;
+- normal bar stresses: Pa.
+
+The same Young's modulus and cross-sectional area are used for every bar. Each node accepts
+horizontal and vertical applied force components and one of four support conditions: free,
+restrained in x, restrained in y, or restrained in both directions. A positive axial force means
+tension; a negative axial force means compression.
+
+The plot distinguishes the initial truss (gray dashed lines) from its displaced shape (blue
+lines). The display amplification factor affects only the plotted displacement, not the numerical
+results. Red arrows show the **input forces only**, starting at the nodes of the initial geometry;
+their direction follows `(Fx, Fy)`, and their lengths are scaled relative to the largest applied
+force for readability. They are not drawn to a physical force scale. Reactions are reported in the
+results table, not drawn as input-force arrows.
+
+The index `m + r - 2j` (bars + restrained degrees of freedom − twice the number of nodes) is a
+static determinacy indicator, not proof of stability. The solver also checks the reduced stiffness
+matrix for mechanisms or insufficient restraints. The analysis assumes small displacements and
+linear-elastic material behavior; it does not model self-weight, thermal strains, buckling, or
+design-code checks.
 
 ## Main functions and what they do
 
@@ -258,9 +294,19 @@ a prismatic beam, linear-elastic homogeneous material, small deflections and Eul
 behavior. They do not check shear stress, buckling, lateral torsional buckling, fatigue,
 connections, or design-code requirements.
 
+### `truss.py`
+
+Implements the 2D truss model and its Streamlit interface. Users add nodes with coordinates,
+support conditions and applied loads, then connect pairs of nodes with bars. The module assembles
+the global stiffness matrix, solves for nodal translations, and reports support reactions, axial
+bar forces and normal stresses. It also plots the initial and amplified displaced geometries with
+red arrows for applied nodal forces only.
+
 ### `show_help()`
 
-This displays usage notes explaining the interpretation of the calculations, units, and the meaning of the key outputs such as `Young's modulus`, `Rm`, `Rc`, and `Rp0.2`.
+This displays usage notes explaining the interpretation and units of the material, beam and truss
+calculations, including how to enter nodes, supports, bar connections and loads, and how to read
+the truss force arrows and results.
 
 ## Typical workflow in the app
 
@@ -281,6 +327,10 @@ This displays usage notes explaining the interpretation of the calculations, uni
 10. In **Résistance des matériaux**, choose a section shape to inspect `A`, `Iy` and `Wel`, or
     switch to beam flexure, enter the span, load and Young's modulus, and inspect the response
     diagrams and calculated maximum values.
+11. In **Calcul de treillis plan**, enter the common bar material properties, add nodes with
+    supports and applied loads, connect them with bars, and calculate the displacements, reactions
+    and axial bar forces. Red arrows on the initial truss indicate only the input nodal forces;
+    adjust the displacement amplification slider to change the deformed-shape visualization.
 
 ## Mechanical interpretation of the results
 
@@ -296,6 +346,9 @@ These values are used to compare materials and assess whether a specimen behaves
 
 ## Summary
 
-MecaLab is a focused mechanical analysis tool for rapid calculation and visualisation of tensile/compression behavior, elastic parameters, and yield points. The mechanics are intentionally simple and engineering-oriented: it emphasizes practical interpretation over high-end finite-element modeling.
+MecaLab is a focused mechanical analysis tool for rapid calculation and visualisation of tensile/compression behavior, elastic parameters, yield points, beam response and 2D truss behavior. The mechanics are intentionally simple and engineering-oriented: it emphasizes practical interpretation over high-end finite-element modeling.
 
-The key mathematical engine is the elastic fit and the 0.2% offset yield detection (`calculate_offset_yield()`), which gives a clear and standard estimate of material yield stress from experimental curves.
+For material testing, the key mathematical engine is the elastic fit and the 0.2% offset yield
+detection (`calculate_offset_yield()`), which estimates material yield stress from experimental
+curves. The truss module is a separate linear-elastic stiffness-method model for planar pin-jointed
+structures and is intended for educational and preliminary analysis.
