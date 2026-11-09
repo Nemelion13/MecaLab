@@ -13,6 +13,7 @@ from streamlit.typing import UploadedFile
 from build_report import *
 from build_report import _report_signature
 from resistance_materials import show_material_strength
+from truss import show_truss_analysis
 
 
 
@@ -1055,8 +1056,8 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-calculation_tab, composite_tab, material_tab, help_tab = st.tabs(
-    ["Essais & calculs simples", "Matériaux composites","Résistance des matériaux", "Notes d'utilisation"]
+calculation_tab, composite_tab, material_tab,truss_tab, help_tab = st.tabs(
+    ["Essais & calculs simples", "Matériaux composites","Résistance des matériaux", "Calcul de treillis plan", "Notes d'utilisation"]
 )
 with calculation_tab:
     show_tensile_analysis()
@@ -1064,5 +1065,7 @@ with composite_tab:
     show_composite_analysis()
 with material_tab:
     show_material_strength()
+with truss_tab:
+    show_truss_analysis()
 with help_tab:
     show_help()

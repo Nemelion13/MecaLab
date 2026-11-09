@@ -1,0 +1,64 @@
+Conception du module Eléments finis : Structures de Barres arcticulés (Treillis)
+
+
+### Modélisation
+
+Un diagramme de structure en treillis.
+Les structures en treillis sont des ossatures modélisées par un graphe, 
+c'est-à-dire un ensemble de sommets reliés par des arêtes, à ceci près que les arêtes sont droites. 
+Ces arêtes représentent les barres ou poutres formant le treillis.
+
+La modélisation repose sur l'hypothèse que les poutres ou profilés de l'ossature sont composées d'un matériau homogène,
+ qui, de plus, se déforme élastiquement.
+
+### Noeud
+
+Les composantes de force sont transmises de barre en barre via les nœuds de jonction. 
+Ces nœuds ou sommets représentent la liaison entre deux ou plusieurs poutres. 
+Dans les systèmes réticulés, il s'agit d'une liaison pivot ou articulation. 
+Une conséquence de ce mode d'assemblage est que les poutres ne se transmettent l'une à l'autre que des tensions ou des compressions.
+
+### Barres
+
+Les arêtes sont appelées éléments de barre ou bielles. 
+Comme les pièces d'un système réticulé sont uniquement soumises à une compression ou à une tension (effort normal), 
+on les modélise comme des ressorts (bien qu'ils soient représentés par des traits droits) : 
+l'allongement de ces barres est proportionnel à la force axiale qu'elles transmettent d'une extrémité à l'autre. 
+La raideur de ces ressorts dépend d'une part de la section de la poutre (ou barre), 
+d'autre part du matériau (supposé homogène) dont elle est constituée
+
+### Appuis
+
+Aux appuis de l'ossature, les composantes du torseur de force (forces et couples) sont transférées du système réticulé vers un socle.
+Selon la nature de la liaison entre les points d'appui et le socle (encastrement, pivot, pivot glissant, etc.), 
+le socle développe des forces de réaction. Les composantes indépendantes de ces forces de réaction sont appelées 
+degrés de liberté du système (treillis+socle). Si la liaison est insuffisante, 
+la position du treillis n'est définie qu'à un déplacement près, et le système constitue un mécanisme ; 
+si le système est 2D et que la structure possède 3 degrés de liberté exactement, elle est isostatique, 
+et les réactions peuvent être déterminées sans faire intervenir d'hypothèse sur la raideur relative des différentes barres ;
+si, en revanche, l'ossature est appuyée sur tant de points que le nombre de degrés de liberté excède 3, 
+le système est dit hyperstatique, et le calcul des forces de réaction doit faire intervenir des conditions de continuité interne,
+qui traduisent que le treillis se déforme sans se disloquer.
+
+### Matrice d'assemblage K
+
+Pour chaque élément barre, on associe une matrice de rigidité dépendante de son orientation angulaire dans le plan.
+Pour obtenir la matrice d'assemblage, il faut simplement que l'élément Kij de la matrice d'assemblage
+corresponde à l'élément K'ij issue de la matrice de rigidité de la barre possédant les noeuds id= i et id = j
+
+Pour 2 noeuds d'une barre, on a une matrice de rigidité 4x4
+K11 est issu de K'11 qui lui-même correspond à l'élément de la matrice de rigidité de la barre 1
+qui possède les noeuds id = 1 et id = 2
+si un noeud n'est pas lié à un autre via une barre alors l'élément de la matrice finale Kij = 0.
+
+
+### Déplacement des noeuds
+
+ On résout l'éqution F = KU
+ avec U le vecteur déplacement globale
+ et F le vecteur gobale des forces des noeuds
+ Pour deux noeuds
+  U = {U1X, U1Y, U2X, U2Y}
+  F = {F1X, F1Y, F2X, F2Y}
+
+
